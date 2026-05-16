@@ -209,8 +209,8 @@ a {
 
 .site-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
     width: 100%;
 }
 
@@ -229,37 +229,55 @@ a {
     position: relative;
     overflow: hidden;
     cursor: pointer;
+    aspect-ratio: 4 / 3;
 }
 
 .preview-slab {
-    height: 132px;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 46%),
         var(--carbon-pattern), var(--color-surface-offset);
 }
 
+.preview-slab::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, transparent 52%, rgba(0, 0, 0, 0.76)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 38%);
+}
+
 .preview-frame {
-    width: 100%;
-    height: 100%;
+    width: calc(100% / 0.26);
+    height: calc(100% / 0.26);
     border: 0;
     background: var(--color-surface-offset);
     pointer-events: none;
     transform-origin: top left;
+    transform: scale(0.26);
 }
 
-.card-body {
-    padding: 12px;
-}
-
-.card-body h2 {
+.card-title {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    left: 12px;
+    z-index: 1;
     margin: 0;
-    font-size: 1.1rem;
+    color: white;
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.2;
     overflow-wrap: anywhere;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
 }
 
 .card-add {
     width: 100%;
-    min-height: 234px;
+    aspect-ratio: 4 / 3;
     color: var(--color-text);
     display: grid;
     place-items: center;
