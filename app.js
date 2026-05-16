@@ -23,6 +23,18 @@ function titleFromHtml(html) {
   return match ? match[1].replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').trim() : ''
 }
 
+function escapeHtml(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function updateTitleInHtml(html, title) {
+  if (!String(html).trim() || !String(title).trim()) return html
+  const titleTag = '<title>' + escapeHtml(title.trim()) + '</title>'
+  if (/<title[^>]*>[\s\S]*?<\/title>/i.test(html)) return html.replace(/<title[^>]*>[\s\S]*?<\/title>/i, titleTag)
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, '<head$1>' + titleTag)
+  return titleTag + '\n' + html
+}
+
 function isHtmlFile(file) {
   return /\.html?$/i.test(file.name)
 }
@@ -132,6 +144,18 @@ document.addEventListener('alpine:init', () => {
         Alpine.store('toasts').add('Delete failed: ' + err.message, 'error')
       }
     },
+    async editPage(page) {
+      try {
+        const res = await fetch('/api/page/' + encodeURIComponent(page.slug))
+        const data = await res.json()
+        if (!data.ok) throw new Error(data.error)
+        const dialog = document.getElementById('addDialog')
+        dialog.showModal()
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent('dialog:edit', { detail: data })))
+      } catch (err) {
+        Alpine.store('toasts').add('Edit failed: ' + err.message, 'error')
+      }
+    },
     async renamePage(page) {
       const next = normalizeSlug(prompt('New slug', page.slug) || '')
       if (!next || next === page.slug) return
@@ -161,6 +185,7 @@ document.addEventListener('alpine:init', () => {
     files: [],
     pageName: '',
     slug: generateSlug(),
+    editSlug: '',
     slugTouched: false,
     canDeploy: false,
     deploying: false,
@@ -170,6 +195,17 @@ document.addEventListener('alpine:init', () => {
       window.addEventListener('dialog:files', (event) => {
         this.setMode('files')
         this.validateFiles(event.detail.files)
+      })
+      window.addEventListener('dialog:edit', (event) => {
+        const page = event.detail
+        this.reset()
+        this.mode = 'editor'
+        this.editSlug = page.slug
+        this.slug = page.slug
+        this.pageName = page.name || page.slug
+        this.htmlContent = page.html || ''
+        this.slugTouched = true
+        this.canDeploy = this.htmlContent.trim().length > 0
       })
     },
     setMode(mode) {
@@ -192,6 +228,7 @@ document.addEventListener('alpine:init', () => {
     },
     syncPageName() {
       this.slugTouched = true
+      if (this.mode === 'editor') this.htmlContent = updateTitleInHtml(this.htmlContent, this.pageName)
       this.slug = this.derivedSlug()
       this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugReady(this.slug) : this.files.length > 0 && !this.renameTarget && slugReady(this.slug)
     },
@@ -280,6 +317,7 @@ document.addEventListener('alpine:init', () => {
       }
     },
     derivedSlug(fallbackName = '') {
+      if (this.editSlug) return this.editSlug
       return slugFromHtml(this.htmlContent) || normalizeSlug(this.pageName) || normalizeSlug(fallbackName) || generateSlug()
     },
     cancelRename() {
@@ -301,6 +339,7 @@ document.addEventListener('alpine:init', () => {
       this.files = []
       this.pageName = ''
       this.slug = generateSlug()
+      this.editSlug = ''
       this.slugTouched = false
       this.canDeploy = false
       this.deploying = false
@@ -309,6 +348,7 @@ document.addEventListener('alpine:init', () => {
       this.$refs.fileInput.value = ''
     },
     async deploy() {
+      if (this.mode === 'editor') this.htmlContent = updateTitleInHtml(this.htmlContent, this.pageName)
       this.slug = this.derivedSlug()
       this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugPattern.test(this.slug) : this.files.length > 0 && !this.renameTarget && slugPattern.test(this.slug)
       if (!this.canDeploy) return
@@ -321,13 +361,14 @@ document.addEventListener('alpine:init', () => {
         fd.append('htmlContent', this.htmlContent)
       } else {
         fd.append('mode', 'files')
-        this.files.forEach((file, index) => fd.append('file_' + index, file, file.name))
+        const files = await this.filesWithUpdatedTitle()
+        files.forEach((file, index) => fd.append('file_' + index, file, file.name))
       }
       try {
-        const res = await fetch('/upload', { method: 'POST', body: fd })
+        const res = await fetch(this.editSlug ? '/api/page/' + encodeURIComponent(this.editSlug) : '/upload', { method: this.editSlug ? 'PUT' : 'POST', body: fd })
         const data = await res.json()
         if (!data.ok) throw new Error(data.error)
-        Alpine.store('toasts').add('Page deployed at ' + data.url, 'success')
+        Alpine.store('toasts').add((this.editSlug ? 'Updated ' : 'Page deployed at ') + data.url, 'success')
         window.dispatchEvent(new CustomEvent('page:deployed'))
         this.close()
       } catch (err) {
@@ -335,6 +376,14 @@ document.addEventListener('alpine:init', () => {
       } finally {
         this.deploying = false
       }
+    },
+    async filesWithUpdatedTitle() {
+      if (!this.pageName.trim()) return this.files
+      const indexFile = this.files.find((file) => file.name.toLowerCase() === 'index.html')
+      if (!indexFile) return this.files
+      const html = updateTitleInHtml(await indexFile.text(), this.pageName)
+      const renamed = new File([html], indexFile.name, { type: indexFile.type || 'text/html' })
+      return this.files.map((file) => file === indexFile ? renamed : file)
     },
     mimeFor(filename) {
       const ext = filename.split('.').pop().toLowerCase()

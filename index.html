@@ -30,15 +30,18 @@
           <template x-for="page in pages" :key="page.slug">
             <article class="site-card">
               <div class="preview-slab"></div>
+              <details class="card-menu">
+                <summary aria-label="Page options">⋯</summary>
+                <div class="card-menu-panel">
+                  <a :href="page.url" target="_blank" rel="noopener">Open</a>
+                  <button type="button" @click="editPage(page)">Edit</button>
+                  <button type="button" @click="copyUrl(page)">Copy link</button>
+                  <button type="button" @click="renamePage(page)">Rename slug</button>
+                  <button class="danger" type="button" @click="deletePage(page)">Delete</button>
+                </div>
+              </details>
               <div class="card-body">
                 <h2 x-text="page.name || page.slug"></h2>
-                <a class="page-link" :href="page.url" target="_blank" rel="noopener" x-text="absoluteUrl(page)"></a>
-                <p x-text="page.fileCount + ' file' + (page.fileCount === 1 ? '' : 's')"></p>
-              </div>
-              <div class="card-actions">
-                <button class="btn-secondary" type="button" @click="copyUrl(page)">Copy</button>
-                <button class="btn-secondary" type="button" @click="renamePage(page)">Rename</button>
-                <button class="btn-danger" type="button" @click="deletePage(page)">Delete</button>
               </div>
             </article>
           </template>
@@ -63,7 +66,7 @@
       <form method="dialog" class="dialog-surface" @submit.prevent="deploy">
         <div class="dialog-header">
           <div>
-            <h2>Add page</h2>
+            <h2 x-text="editSlug ? 'Edit page' : 'Add page'"></h2>
           </div>
           <button class="btn-secondary" type="button" @click="chooseFiles()">Upload</button>
         </div>
@@ -99,7 +102,7 @@
 
         <div class="dialog-footer">
           <button class="btn-secondary" type="button" @click="close()">Cancel</button>
-          <button class="btn-primary" type="submit" :disabled="!canDeploy || deploying" x-text="deploying ? 'Deploying...' : 'Save'"></button>
+          <button class="btn-primary" type="submit" :disabled="!canDeploy || deploying" x-text="deploying ? 'Saving...' : editSlug ? 'Update' : 'Save'"></button>
         </div>
       </form>
     </dialog>

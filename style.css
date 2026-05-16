@@ -133,7 +133,6 @@ a {
 .app-header,
 .header-actions,
 .section-heading,
-.card-actions,
 .dialog-header,
 .dialog-footer,
 .rename-banner,
@@ -157,7 +156,6 @@ a {
 }
 
 .header-actions,
-.card-actions,
 .dialog-footer,
 .rename-banner > div {
     gap: 10px;
@@ -189,8 +187,6 @@ a {
 }
 
 .eyebrow,
-.page-link,
-.site-card p,
 .card-add small,
 .field-label span {
     color: var(--color-muted);
@@ -230,11 +226,12 @@ a {
 }
 
 .site-card {
+    position: relative;
     overflow: hidden;
 }
 
 .preview-slab {
-    height: 86px;
+    height: 132px;
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 46%),
         var(--carbon-pattern), var(--color-surface-offset);
@@ -245,26 +242,9 @@ a {
 }
 
 .card-body h2 {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: 1.1rem;
     overflow-wrap: anywhere;
-}
-
-.page-link {
-    display: block;
-    overflow-wrap: anywhere;
-    text-decoration: none;
-    text-transform: none;
-    letter-spacing: 0.02em;
-}
-
-.site-card p {
-    margin: 12px 0 0;
-}
-
-.card-actions {
-    flex-wrap: wrap;
-    padding: 0 10px 10px;
 }
 
 .card-add {
@@ -275,6 +255,66 @@ a {
     place-items: center;
     align-content: center;
     gap: 10px;
+}
+
+.card-menu {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+}
+
+.card-menu summary {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+    color: var(--color-text);
+    cursor: pointer;
+    list-style: none;
+    backdrop-filter: blur(10px);
+}
+
+.card-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.card-menu-panel {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    min-width: 150px;
+    padding: 6px;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-raised);
+    box-shadow: var(--shadow-panel);
+}
+
+.card-menu-panel a,
+.card-menu-panel button {
+    width: 100%;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    background: transparent;
+    text-align: left;
+    text-decoration: none;
+}
+
+.card-menu-panel a:hover,
+.card-menu-panel button:hover {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.card-menu-panel .danger {
+    color: var(--color-danger);
 }
 
 .card-add span {
@@ -523,7 +563,6 @@ textarea {
     }
 
     .header-actions,
-    .card-actions,
     .rename-banner > div {
         flex-wrap: wrap;
     }
