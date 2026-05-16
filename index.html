@@ -28,16 +28,17 @@
       <main class="app-main" aria-label="Pages">
         <section class="site-grid" aria-label="Deployed pages">
           <template x-for="page in pages" :key="page.slug">
-            <article class="site-card">
-              <div class="preview-slab"></div>
-              <details class="card-menu">
+            <article class="site-card" role="link" tabindex="0" @click="openPage(page)" @keydown.enter.prevent="openPage(page)">
+              <div class="preview-slab">
+                <iframe class="preview-frame" :src="page.url" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
+              </div>
+              <details class="card-menu" @click.stop>
                 <summary aria-label="Page options">⋯</summary>
                 <div class="card-menu-panel">
-                  <a :href="page.url" target="_blank" rel="noopener">Open</a>
-                  <button type="button" @click="editPage(page)">Edit</button>
-                  <button type="button" @click="copyUrl(page)">Copy link</button>
-                  <button type="button" @click="renamePage(page)">Rename slug</button>
-                  <button class="danger" type="button" @click="deletePage(page)">Delete</button>
+                  <a :href="page.url" target="_blank" rel="noopener" @click.stop>Open</a>
+                  <button type="button" @click.stop="editPage(page)">Edit</button>
+                  <button type="button" @click.stop="copyUrl(page)">Copy link</button>
+                  <button class="danger" type="button" @click.stop="deletePage(page)">Delete</button>
                 </div>
               </details>
               <div class="card-body">

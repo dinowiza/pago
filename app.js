@@ -127,6 +127,9 @@ document.addEventListener('alpine:init', () => {
     absoluteUrl(page) {
       return new URL(page.url, window.location.origin).toString()
     },
+    openPage(page) {
+      window.open(page.url, '_blank', 'noopener')
+    },
     async copyUrl(page) {
       const url = this.absoluteUrl(page)
       await navigator.clipboard.writeText(url)
@@ -154,27 +157,6 @@ document.addEventListener('alpine:init', () => {
         queueMicrotask(() => window.dispatchEvent(new CustomEvent('dialog:edit', { detail: data })))
       } catch (err) {
         Alpine.store('toasts').add('Edit failed: ' + err.message, 'error')
-      }
-    },
-    async renamePage(page) {
-      const next = normalizeSlug(prompt('New slug', page.slug) || '')
-      if (!next || next === page.slug) return
-      if (!slugPattern.test(next)) {
-        Alpine.store('toasts').add('Slug must be 3-32 lowercase letters, numbers, or hyphens.', 'error')
-        return
-      }
-      try {
-        const res = await fetch('/api/page/' + encodeURIComponent(page.slug), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: next })
-        })
-        const data = await res.json()
-        if (!data.ok) throw new Error(data.error)
-        await this.reloadPages()
-        Alpine.store('toasts').add('Renamed to ' + data.url, 'success')
-      } catch (err) {
-        Alpine.store('toasts').add('Rename failed: ' + err.message, 'error')
       }
     }
   }))
@@ -219,15 +201,12 @@ document.addEventListener('alpine:init', () => {
     },
     syncEditorState() {
       this.mode = 'editor'
-      if (!this.slugTouched) {
-        const title = titleFromHtml(this.htmlContent)
-        if (title && !this.pageName) this.pageName = title
-        this.slug = this.derivedSlug()
-      }
+      const title = titleFromHtml(this.htmlContent)
+      if (title && !this.pageName) this.pageName = title
+      this.slug = this.derivedSlug()
       this.canDeploy = this.htmlContent.trim().length > 0 && slugReady(this.slug)
     },
     syncPageName() {
-      this.slugTouched = true
       if (this.mode === 'editor') this.htmlContent = updateTitleInHtml(this.htmlContent, this.pageName)
       this.slug = this.derivedSlug()
       this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugReady(this.slug) : this.files.length > 0 && !this.renameTarget && slugReady(this.slug)
@@ -262,7 +241,7 @@ document.addEventListener('alpine:init', () => {
 
       const indexFile = incoming.find((file) => file.name.toLowerCase() === 'index.html')
       this.files = incoming
-      if (!this.slugTouched) await this.syncSlugFromFile(htmlFiles[0])
+      await this.syncSlugFromFile(htmlFiles[0])
       if (indexFile) {
         this.canDeploy = slugReady(this.slug)
         return
@@ -317,7 +296,6 @@ document.addEventListener('alpine:init', () => {
       }
     },
     derivedSlug(fallbackName = '') {
-      if (this.editSlug) return this.editSlug
       return slugFromHtml(this.htmlContent) || normalizeSlug(this.pageName) || normalizeSlug(fallbackName) || generateSlug()
     },
     cancelRename() {

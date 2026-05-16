@@ -65,32 +65,50 @@ export async function onRequestPut({ request, params, env }) {
   try {
     const slug = params.slug
     const form = await request.formData()
+    const nextSlug = String(form.get('slug') || slug).trim()
     const name = String(form.get('name') || slug).trim() || slug
     const mode = form.get('mode')
     if (!mode) return json({ ok: false, error: 'missing_mode' }, 400)
+    if (!validateSlug(nextSlug)) return json({ ok: false, error: 'invalid_slug' }, 400)
 
     const manifest = await readManifest(env.BUCKET)
     const record = manifest.find((page) => page.slug === slug)
     if (!record) return json({ ok: false, error: 'not_found' }, 404)
+    if (nextSlug !== slug && manifest.some((page) => page.slug === nextSlug)) return json({ ok: false, error: 'slug_exists' }, 409)
+
+    if (nextSlug !== slug) {
+      const oldObjects = await listAll(env.BUCKET, `pages/${slug}/`)
+      for (const object of oldObjects) {
+        const source = await env.BUCKET.get(object.key)
+        if (!source) continue
+        const relative = object.key.slice(`pages/${slug}/`.length)
+        await env.BUCKET.put(`pages/${nextSlug}/${relative}`, source.body, {
+          httpMetadata: source.httpMetadata
+        })
+      }
+      await Promise.all(oldObjects.map((object) => env.BUCKET.delete(object.key)))
+      record.slug = nextSlug
+      record.url = `/p/${nextSlug}`
+    }
 
     let fileCount = record.fileCount
     if (mode === 'editor') {
       const htmlContent = form.get('htmlContent')
       if (!htmlContent || !String(htmlContent).trim()) return json({ ok: false, error: 'missing_html_content' }, 400)
-      await env.BUCKET.put(`pages/${slug}/index.html`, String(htmlContent), {
+      await env.BUCKET.put(`pages/${nextSlug}/index.html`, String(htmlContent), {
         httpMetadata: { contentType: 'text/html; charset=utf-8' }
       })
-      fileCount = (await listAll(env.BUCKET, `pages/${slug}/`)).length
+      fileCount = (await listAll(env.BUCKET, `pages/${nextSlug}/`)).length
     } else if (mode === 'files') {
       const files = Array.from(form.entries()).filter(([key, value]) => key.startsWith('file_') && value && typeof value.arrayBuffer === 'function').map(([, value]) => value)
       if (!files.some((file) => file.name === 'index.html')) return json({ ok: false, error: 'no_html_in_files' }, 400)
       for (const file of files) {
         if (!safeObjectName(file.name)) return json({ ok: false, error: 'invalid_file_path' }, 400)
       }
-      const objects = await listAll(env.BUCKET, `pages/${slug}/`)
+      const objects = await listAll(env.BUCKET, `pages/${nextSlug}/`)
       await Promise.all(objects.map((object) => env.BUCKET.delete(object.key)))
       for (const file of files) {
-        await env.BUCKET.put(`pages/${slug}/${file.name}`, file.stream(), {
+        await env.BUCKET.put(`pages/${nextSlug}/${file.name}`, file.stream(), {
           httpMetadata: { contentType: file.type || contentTypeFor(file.name) }
         })
       }
@@ -102,7 +120,7 @@ export async function onRequestPut({ request, params, env }) {
     record.name = name
     record.fileCount = fileCount
     await writeManifest(env.BUCKET, manifest)
-    return json({ ok: true, slug, url: record.url })
+    return json({ ok: true, slug: nextSlug, url: record.url })
   } catch {
     return json({ ok: false, error: 'r2_update_failed' }, 500)
   }
