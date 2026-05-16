@@ -209,8 +209,8 @@ a {
 
 .site-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(264px, 1fr));
+    gap: 16px;
     width: 100%;
 }
 
@@ -227,7 +227,6 @@ a {
 
 .site-card {
     position: relative;
-    overflow: hidden;
     cursor: pointer;
     aspect-ratio: 4 / 3;
 }
@@ -235,6 +234,7 @@ a {
 .preview-slab {
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     overflow: hidden;
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 46%),
@@ -290,6 +290,10 @@ a {
     top: 8px;
     right: 8px;
     z-index: 2;
+}
+
+.card-menu[open] {
+    z-index: 20;
 }
 
 .card-menu summary {

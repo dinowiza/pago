@@ -32,7 +32,7 @@
               <div class="preview-slab">
                 <iframe class="preview-frame" :src="page.url" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
               </div>
-              <details class="card-menu" @click.stop>
+              <details class="card-menu" @click.stop @click.outside="$el.removeAttribute('open')" @keydown.escape.prevent="$el.removeAttribute('open')">
                 <summary aria-label="Page options">⋯</summary>
                 <div class="card-menu-panel">
                   <a :href="page.url" target="_blank" rel="noopener" @click.stop>Open</a>
