@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" x-data x-bind:data-theme="$store.theme.value">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pago</title>
+    <script>document.documentElement.dataset.theme = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=DM+Sans:wght@400;500;700&display=block" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script type="module">import { customAlphabet } from 'https://cdn.jsdelivr.net/npm/nanoid@5.0.7/+esm'; window.PagoNanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8)</script>
+    <script defer src="app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  </head>
+  <body x-data="app" @page:deployed.window="reloadPages" @dragenter.prevent="handleDragEnter($event)" @dragleave.window="handleDragLeave($event)" @dragend.window="clearDragging()" @blur.window="clearDragging()" @dragover.prevent @drop.prevent="handleMainDrop($event)">
+    <div class="page-shell">
+      <header class="app-header">
+        <a class="app-logo" href="/" aria-label="Pago home">Pago</a>
+        <div class="header-actions">
+          <button class="icon-btn theme-toggle" type="button" aria-label="Toggle theme" @click="$store.theme.toggle()">
+            <span aria-hidden="true" x-text="$store.theme.value === 'dark' ? '☼' : '◐'"></span>
+          </button>
+        </div>
+      </header>
+
+      <main class="app-main" aria-label="Pages">
+        <section class="site-grid" aria-label="Deployed pages">
+          <template x-for="page in pages" :key="page.slug">
+            <article class="site-card">
+              <div class="preview-slab"></div>
+              <div class="card-body">
+                <h2 x-text="page.name || page.slug"></h2>
+                <a class="page-link" :href="page.url" target="_blank" rel="noopener" x-text="absoluteUrl(page)"></a>
+                <p x-text="page.fileCount + ' file' + (page.fileCount === 1 ? '' : 's')"></p>
+              </div>
+              <div class="card-actions">
+                <button class="btn-secondary" type="button" @click="copyUrl(page)">Copy</button>
+                <button class="btn-secondary" type="button" @click="renamePage(page)">Rename</button>
+                <button class="btn-danger" type="button" @click="deletePage(page)">Delete</button>
+              </div>
+            </article>
+          </template>
+
+          <button class="card-add" type="button" @click="openDialog()">
+            <span>+</span>
+            <strong>Add page</strong>
+            <small>Paste HTML, upload files, or drop a ZIP</small>
+          </button>
+        </section>
+      </main>
+    </div>
+
+    <div class="drag-overlay" x-cloak x-show="dragging" x-transition.opacity>
+      <div>
+        <p class="eyebrow">Drop files</p>
+        <strong>Drop to deploy</strong>
+      </div>
+    </div>
+
+    <dialog id="addDialog" class="add-dialog" x-data="addDialog" @cancel.prevent="close">
+      <form method="dialog" class="dialog-surface" @submit.prevent="deploy">
+        <div class="dialog-header">
+          <div>
+            <h2>Add page</h2>
+          </div>
+          <button class="btn-secondary" type="button" @click="chooseFiles()">Upload</button>
+        </div>
+
+        <input class="sr-only" type="file" multiple accept=".html,.htm,.css,.js,.json,.svg,.png,.jpg,.jpeg,.webp,.gif,.woff,.woff2,.zip" x-ref="fileInput" @change="validateFiles($event.target.files)">
+
+        <div class="editor-zone" :class="extracting ? 'is-loading' : ''">
+          <textarea x-show="mode === 'editor'" x-model="htmlContent" @input="syncEditorState" placeholder="Paste HTML or drag files here…"></textarea>
+          <div class="file-summary" x-show="mode === 'files'">
+            <strong x-text="extracting ? 'Extracting ZIP...' : files.length ? files.length + ' file(s) ready' : 'Choose files or drop them on the page'"></strong>
+            <template x-if="files.length">
+              <ul>
+                <template x-for="file in files.slice(0, 6)" :key="file.name">
+                  <li x-text="file.name"></li>
+                </template>
+              </ul>
+            </template>
+          </div>
+        </div>
+
+        <div class="rename-banner" x-show="renameTarget">
+          <span x-text="renameTarget ? 'Use ' + renameTarget.name + ' as index.html?' : ''"></span>
+          <div>
+            <button class="btn-secondary" type="button" @click="cancelRename()">Cancel</button>
+            <button class="btn-primary" type="button" @click="confirmRename()">Use as index</button>
+          </div>
+        </div>
+
+        <label class="field-label">
+          <span>Page name</span>
+          <input type="text" x-model="pageName" @input="syncPageName" maxlength="80" placeholder="Portfolio v2">
+        </label>
+
+        <div class="dialog-footer">
+          <button class="btn-secondary" type="button" @click="close()">Cancel</button>
+          <button class="btn-primary" type="submit" :disabled="!canDeploy || deploying" x-text="deploying ? 'Deploying...' : 'Save'"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast-stack" aria-live="polite">
+      <template x-for="toast in $store.toasts.items" :key="toast.id">
+        <div class="toast" :class="toast.type" x-text="toast.message"></div>
+      </template>
+    </div>
+  </body>
+</html>

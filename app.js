@@ -1,0 +1,358 @@
+const slugPattern = /^[a-z0-9-]{3,32}$/
+
+function generateSlug() {
+  try {
+    if (window.PagoNanoid) return window.PagoNanoid()
+    if (crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+    return crypto.getRandomValues(new Uint32Array(1))[0].toString(36).padStart(8, '0').slice(0, 8)
+  } catch {
+    return Math.random().toString(36).slice(2, 10)
+  }
+}
+
+function normalizeSlug(value) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32)
+}
+
+function slugFromHtml(html) {
+  return normalizeSlug(titleFromHtml(html))
+}
+
+function titleFromHtml(html) {
+  const match = String(html).match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+  return match ? match[1].replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').trim() : ''
+}
+
+function isHtmlFile(file) {
+  return /\.html?$/i.test(file.name)
+}
+
+function isZipFile(file) {
+  return /\.zip$/i.test(file.name)
+}
+
+function slugReady(slug) {
+  return !slug || slugPattern.test(slug)
+}
+
+function hasUnsafePath(name) {
+  return name.startsWith('/') || name.split('/').some((part) => part === '..' || part === '')
+}
+
+document.addEventListener('alpine:init', () => {
+  Alpine.store('theme', {
+    value: 'dark',
+    init() {
+      const stored = localStorage.getItem('theme')
+      if (stored === 'dark' || stored === 'light') {
+        this.value = stored
+        return
+      }
+      this.value = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+    },
+    toggle() {
+      this.value = this.value === 'dark' ? 'light' : 'dark'
+      localStorage.setItem('theme', this.value)
+    }
+  })
+
+  Alpine.store('toasts', {
+    items: [],
+    add(message, type = 'info') {
+      const id = generateSlug()
+      this.items.push({ id, message, type, dismissAt: Date.now() + 3000 })
+      setTimeout(() => this.remove(id), 3000)
+    },
+    remove(id) {
+      this.items = this.items.filter((toast) => toast.id !== id)
+    }
+  })
+
+  Alpine.data('app', () => ({
+    pages: [],
+    dragging: false,
+    async init() {
+      Alpine.store('theme').init()
+      await this.reloadPages()
+    },
+    async reloadPages() {
+      try {
+        const res = await fetch('/api/pages')
+        if (res.status === 404) {
+          this.pages = []
+          return
+        }
+        if (!res.ok) throw new Error('manifest_read_failed')
+        this.pages = await res.json()
+      } catch (err) {
+        Alpine.store('toasts').add('Could not load pages: ' + err.message, 'error')
+      }
+    },
+    openDialog(files = null) {
+      const dialog = document.getElementById('addDialog')
+      dialog.showModal()
+      if (files) {
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent('dialog:files', { detail: { files } })))
+      }
+    },
+    handleDragEnter(event) {
+      if (Array.from(event.dataTransfer.types).includes('Files')) {
+        this.dragging = true
+      }
+    },
+    handleDragLeave(event) {
+      const leftViewport = event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight
+      if (leftViewport) this.clearDragging()
+    },
+    clearDragging() {
+      this.dragging = false
+    },
+    handleMainDrop(event) {
+      this.clearDragging()
+      const files = event.dataTransfer.files
+      if (files.length > 0) this.openDialog(files)
+    },
+    absoluteUrl(page) {
+      return new URL(page.url, window.location.origin).toString()
+    },
+    async copyUrl(page) {
+      const url = this.absoluteUrl(page)
+      await navigator.clipboard.writeText(url)
+      Alpine.store('toasts').add('Copied ' + url, 'success')
+    },
+    async deletePage(page) {
+      if (!confirm('Delete ' + page.slug + '?')) return
+      try {
+        const res = await fetch('/api/page/' + encodeURIComponent(page.slug), { method: 'DELETE' })
+        const data = await res.json()
+        if (!data.ok) throw new Error(data.error)
+        this.pages = this.pages.filter((item) => item.slug !== page.slug)
+        Alpine.store('toasts').add('Deleted ' + page.slug, 'success')
+      } catch (err) {
+        Alpine.store('toasts').add('Delete failed: ' + err.message, 'error')
+      }
+    },
+    async renamePage(page) {
+      const next = normalizeSlug(prompt('New slug', page.slug) || '')
+      if (!next || next === page.slug) return
+      if (!slugPattern.test(next)) {
+        Alpine.store('toasts').add('Slug must be 3-32 lowercase letters, numbers, or hyphens.', 'error')
+        return
+      }
+      try {
+        const res = await fetch('/api/page/' + encodeURIComponent(page.slug), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: next })
+        })
+        const data = await res.json()
+        if (!data.ok) throw new Error(data.error)
+        await this.reloadPages()
+        Alpine.store('toasts').add('Renamed to ' + data.url, 'success')
+      } catch (err) {
+        Alpine.store('toasts').add('Rename failed: ' + err.message, 'error')
+      }
+    }
+  }))
+
+  Alpine.data('addDialog', () => ({
+    mode: 'editor',
+    htmlContent: '',
+    files: [],
+    pageName: '',
+    slug: generateSlug(),
+    slugTouched: false,
+    canDeploy: false,
+    deploying: false,
+    extracting: false,
+    renameTarget: null,
+    init() {
+      window.addEventListener('dialog:files', (event) => {
+        this.setMode('files')
+        this.validateFiles(event.detail.files)
+      })
+    },
+    setMode(mode) {
+      this.mode = mode
+      this.renameTarget = null
+      this.canDeploy = mode === 'editor' && this.htmlContent.trim().length > 0 && slugReady(this.slug)
+    },
+    chooseFiles() {
+      this.setMode('files')
+      this.$refs.fileInput.click()
+    },
+    syncEditorState() {
+      this.mode = 'editor'
+      if (!this.slugTouched) {
+        const title = titleFromHtml(this.htmlContent)
+        if (title && !this.pageName) this.pageName = title
+        this.slug = this.derivedSlug()
+      }
+      this.canDeploy = this.htmlContent.trim().length > 0 && slugReady(this.slug)
+    },
+    syncPageName() {
+      this.slugTouched = true
+      this.slug = this.derivedSlug()
+      this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugReady(this.slug) : this.files.length > 0 && !this.renameTarget && slugReady(this.slug)
+    },
+    async validateFiles(fileList) {
+      const incoming = Array.from(fileList)
+      this.mode = 'files'
+      this.files = []
+      this.renameTarget = null
+      this.canDeploy = false
+
+      if (incoming.length === 0) {
+        this.abort('No files selected.')
+        return
+      }
+
+      if (incoming.length === 1 && isZipFile(incoming[0])) {
+        await this.extractZip(incoming[0])
+        return
+      }
+
+      if (incoming.some((file) => hasUnsafePath(file.name))) {
+        this.abort('File paths cannot contain empty segments or parent directories.')
+        return
+      }
+
+      const htmlFiles = incoming.filter(isHtmlFile)
+      if (htmlFiles.length === 0) {
+        this.abort(incoming.length === 1 ? 'No HTML file found. Upload must contain at least one .html file.' : 'Upload must contain at least one HTML file.')
+        return
+      }
+
+      const indexFile = incoming.find((file) => file.name.toLowerCase() === 'index.html')
+      this.files = incoming
+      if (!this.slugTouched) await this.syncSlugFromFile(htmlFiles[0])
+      if (indexFile) {
+        this.canDeploy = slugReady(this.slug)
+        return
+      }
+
+      this.renameTarget = htmlFiles[0]
+    },
+    async extractZip(zipFile) {
+      if (!window.JSZip) {
+        this.abort('ZIP support failed to load.')
+        return
+      }
+      this.extracting = true
+      try {
+        const zip = await window.JSZip.loadAsync(zipFile)
+        const extracted = []
+        for (const [relativePath, entry] of Object.entries(zip.files)) {
+          if (entry.dir) continue
+          if (relativePath.startsWith('__MACOSX/')) continue
+          const parts = relativePath.split('/').filter(Boolean)
+          if (parts.some((part) => part.startsWith('.') || part === '..')) continue
+          const filename = parts.join('/')
+          const blob = await entry.async('blob')
+          extracted.push(new File([blob], filename, { type: this.mimeFor(filename) }))
+        }
+        if (extracted.length === 0) {
+          this.abort('ZIP is empty or contains only skipped files.')
+          return
+        }
+        await this.validateFiles(extracted)
+      } catch (err) {
+        this.abort('Failed to extract ZIP: ' + err.message)
+      } finally {
+        this.extracting = false
+      }
+    },
+    confirmRename() {
+      if (!this.renameTarget) return
+      const renamed = new File([this.renameTarget], 'index.html', { type: this.renameTarget.type || 'text/html' })
+      this.files = this.files.map((file) => file === this.renameTarget ? renamed : file)
+      this.renameTarget = null
+      this.canDeploy = slugReady(this.slug)
+    },
+    async syncSlugFromFile(file) {
+      try {
+        const html = await file.text()
+        const title = titleFromHtml(html)
+        if (title && !this.pageName) this.pageName = title
+        this.slug = this.derivedSlug(file.name.replace(/\.html?$/i, ''))
+      } catch {
+        this.slug = this.derivedSlug()
+      }
+    },
+    derivedSlug(fallbackName = '') {
+      return slugFromHtml(this.htmlContent) || normalizeSlug(this.pageName) || normalizeSlug(fallbackName) || generateSlug()
+    },
+    cancelRename() {
+      this.abort('Upload cancelled.')
+    },
+    abort(message) {
+      this.files = []
+      this.renameTarget = null
+      this.canDeploy = false
+      Alpine.store('toasts').add(message, 'error')
+    },
+    close() {
+      this.$root.close()
+      this.reset()
+    },
+    reset() {
+      this.mode = 'editor'
+      this.htmlContent = ''
+      this.files = []
+      this.pageName = ''
+      this.slug = generateSlug()
+      this.slugTouched = false
+      this.canDeploy = false
+      this.deploying = false
+      this.extracting = false
+      this.renameTarget = null
+      this.$refs.fileInput.value = ''
+    },
+    async deploy() {
+      this.slug = this.derivedSlug()
+      this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugPattern.test(this.slug) : this.files.length > 0 && !this.renameTarget && slugPattern.test(this.slug)
+      if (!this.canDeploy) return
+      this.deploying = true
+      const fd = new FormData()
+      fd.append('slug', this.slug)
+      fd.append('name', this.pageName.trim() || this.slug)
+      if (this.mode === 'editor') {
+        fd.append('mode', 'editor')
+        fd.append('htmlContent', this.htmlContent)
+      } else {
+        fd.append('mode', 'files')
+        this.files.forEach((file, index) => fd.append('file_' + index, file, file.name))
+      }
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: fd })
+        const data = await res.json()
+        if (!data.ok) throw new Error(data.error)
+        Alpine.store('toasts').add('Page deployed at ' + data.url, 'success')
+        window.dispatchEvent(new CustomEvent('page:deployed'))
+        this.close()
+      } catch (err) {
+        Alpine.store('toasts').add('Deploy failed: ' + err.message, 'error')
+      } finally {
+        this.deploying = false
+      }
+    },
+    mimeFor(filename) {
+      const ext = filename.split('.').pop().toLowerCase()
+      return {
+        html: 'text/html',
+        htm: 'text/html',
+        css: 'text/css',
+        js: 'text/javascript',
+        json: 'application/json',
+        svg: 'image/svg+xml',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+        gif: 'image/gif',
+        woff2: 'font/woff2',
+        woff: 'font/woff'
+      }[ext] || 'application/octet-stream'
+    }
+  }))
+})
