@@ -290,6 +290,7 @@ a {
     top: 8px;
     right: 8px;
     z-index: 2;
+    color-scheme: inherit;
 }
 
 .card-menu[open] {
@@ -297,13 +298,14 @@ a {
 }
 
 .card-menu summary {
+    appearance: none;
     width: 36px;
     height: 36px;
     display: grid;
     place-items: center;
     border: 1px solid var(--color-line);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+    background: var(--color-surface-raised);
     color: var(--color-text);
     cursor: pointer;
     list-style: none;
@@ -323,11 +325,13 @@ a {
     border: 1px solid var(--color-line);
     border-radius: var(--radius-md);
     background: var(--color-surface-raised);
+    color: var(--color-text);
     box-shadow: var(--shadow-panel);
 }
 
 .card-menu-panel a,
 .card-menu-panel button {
+    appearance: none;
     width: 100%;
     min-height: 36px;
     display: flex;

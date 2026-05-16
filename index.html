@@ -30,7 +30,7 @@
           <template x-for="page in pages" :key="page.slug">
             <article class="site-card" role="link" tabindex="0" @click="openPage(page)" @keydown.enter.prevent="openPage(page)">
               <div class="preview-slab">
-                <iframe class="preview-frame" :src="page.url" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
+                <iframe class="preview-frame" :src="page.url" loading="lazy" scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
               </div>
               <details class="card-menu" @click.stop @click.outside="$el.removeAttribute('open')" @keydown.escape.prevent="$el.removeAttribute('open')">
                 <summary aria-label="Page options">⋯</summary>
@@ -61,7 +61,7 @@
       </div>
     </div>
 
-    <dialog id="addDialog" class="add-dialog" x-data="addDialog" @cancel.prevent="close">
+    <dialog id="addDialog" class="add-dialog" x-data="addDialog" @cancel.self.prevent="close">
       <form method="dialog" class="dialog-surface" @submit.prevent="deploy">
         <div class="dialog-header">
           <div>
@@ -70,7 +70,7 @@
           <button class="btn-secondary" type="button" @click="chooseFiles()">Upload</button>
         </div>
 
-        <input class="sr-only" type="file" multiple accept=".html,.htm,.css,.js,.json,.svg,.png,.jpg,.jpeg,.webp,.gif,.woff,.woff2,.zip" x-ref="fileInput" @change="validateFiles($event.target.files)">
+        <input class="sr-only" type="file" multiple accept=".html,.htm,.css,.js,.json,.svg,.png,.jpg,.jpeg,.webp,.gif,.woff,.woff2,.zip" x-ref="fileInput" @change="validateFiles($event.target.files)" @cancel.stop="restoreFileChoiceState()">
 
         <div class="editor-zone" :class="extracting ? 'is-loading' : ''">
           <textarea x-show="mode === 'editor'" x-model="htmlContent" @input="syncEditorState" placeholder="Paste HTML or drag files here…"></textarea>

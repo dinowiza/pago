@@ -173,6 +173,7 @@ document.addEventListener('alpine:init', () => {
     deploying: false,
     extracting: false,
     renameTarget: null,
+    fileChoiceState: null,
     init() {
       window.addEventListener('dialog:files', (event) => {
         this.setMode('files')
@@ -196,8 +197,22 @@ document.addEventListener('alpine:init', () => {
       this.canDeploy = mode === 'editor' && this.htmlContent.trim().length > 0 && slugReady(this.slug)
     },
     chooseFiles() {
+      this.fileChoiceState = {
+        mode: this.mode,
+        files: this.files,
+        canDeploy: this.canDeploy,
+        renameTarget: this.renameTarget
+      }
       this.setMode('files')
       this.$refs.fileInput.click()
+    },
+    restoreFileChoiceState() {
+      if (!this.fileChoiceState) return
+      this.mode = this.fileChoiceState.mode
+      this.files = this.fileChoiceState.files
+      this.canDeploy = this.fileChoiceState.canDeploy
+      this.renameTarget = this.fileChoiceState.renameTarget
+      this.fileChoiceState = null
     },
     syncEditorState() {
       this.mode = 'editor'
@@ -212,6 +227,7 @@ document.addEventListener('alpine:init', () => {
       this.canDeploy = this.mode === 'editor' ? this.htmlContent.trim().length > 0 && slugReady(this.slug) : this.files.length > 0 && !this.renameTarget && slugReady(this.slug)
     },
     async validateFiles(fileList) {
+      this.fileChoiceState = null
       const incoming = Array.from(fileList)
       this.mode = 'files'
       this.files = []
@@ -323,6 +339,7 @@ document.addEventListener('alpine:init', () => {
       this.deploying = false
       this.extracting = false
       this.renameTarget = null
+      this.fileChoiceState = null
       this.$refs.fileInput.value = ''
     },
     async deploy() {
