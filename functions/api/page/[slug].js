@@ -119,6 +119,7 @@ export async function onRequestPut({ request, params, env }) {
 
     record.name = name
     record.fileCount = fileCount
+    record.updatedAt = new Date().toISOString()
     await writeManifest(env.BUCKET, manifest)
     return json({ ok: true, slug: nextSlug, url: record.url })
   } catch {

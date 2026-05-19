@@ -127,6 +127,11 @@ document.addEventListener('alpine:init', () => {
     absoluteUrl(page) {
       return new URL(page.url, window.location.origin).toString()
     },
+    previewUrl(page) {
+      const url = new URL(page.url, window.location.origin)
+      url.searchParams.set('v', page.updatedAt || page.createdAt || page.slug)
+      return url.pathname + url.search
+    },
     openPage(page) {
       window.open(page.url, '_blank', 'noopener')
     },

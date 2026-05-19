@@ -36,10 +36,12 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: 'invalid_mode' }, 400)
     }
 
+    const now = new Date().toISOString()
     manifest.push({
       slug,
       name,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       url: `/p/${slug}`,
       fileCount
     })

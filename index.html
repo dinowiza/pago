@@ -30,7 +30,7 @@
           <template x-for="page in pages" :key="page.slug">
             <article class="site-card" role="link" tabindex="0" @click="openPage(page)" @keydown.enter.prevent="openPage(page)">
               <div class="preview-slab">
-                <iframe class="preview-frame" :src="page.url" loading="lazy" scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+                <iframe class="preview-frame" :src="previewUrl(page)" loading="lazy" scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
               </div>
               <details class="card-menu" @click.stop @click.outside="$el.removeAttribute('open')" @keydown.escape.prevent="$el.removeAttribute('open')">
                 <summary aria-label="Page options">⋯</summary>
