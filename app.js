@@ -194,14 +194,12 @@ document.addEventListener('alpine:init', () => {
       try {
         const dialog = document.getElementById('addDialog')
         dialog.showModal()
-        window.dispatchEvent(new CustomEvent('dialog:edit-loading', { detail: { slug: page.slug, name: page.name || page.slug } }))
-        await new Promise((resolve) => requestAnimationFrame(resolve))
+        window.dispatchEvent(new CustomEvent('dialog:edit-start', { detail: { slug: page.slug, name: page.name || page.slug } }))
         const res = await fetch('/api/page/' + encodeURIComponent(page.slug))
         const data = await res.json()
         if (!data.ok) throw new Error(data.error)
         queueMicrotask(() => window.dispatchEvent(new CustomEvent('dialog:edit', { detail: data })))
       } catch (err) {
-        window.dispatchEvent(new CustomEvent('dialog:edit-failed'))
         Alpine.store('modal').openNotice('Edit failed', err.message)
         Alpine.store('toasts').add('Edit failed: ' + err.message, 'error')
       }
@@ -223,7 +221,7 @@ document.addEventListener('alpine:init', () => {
     renameTarget: null,
     fileChoiceState: null,
     init() {
-      window.addEventListener('dialog:edit-loading', (event) => {
+      window.addEventListener('dialog:edit-start', (event) => {
         this.reset()
         this.mode = 'editor'
         this.isLoadingEdit = true
@@ -237,17 +235,14 @@ document.addEventListener('alpine:init', () => {
       })
       window.addEventListener('dialog:edit', (event) => {
         const page = event.detail
-        this.isLoadingEdit = false
         this.mode = 'editor'
+        this.isLoadingEdit = false
         this.editSlug = page.slug
         this.slug = page.slug
         this.pageName = page.name || page.slug
         this.htmlContent = page.html || ''
         this.slugTouched = true
         this.canDeploy = this.htmlContent.trim().length > 0
-      })
-      window.addEventListener('dialog:edit-failed', () => {
-        this.isLoadingEdit = false
       })
     },
     setMode(mode) {
