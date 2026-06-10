@@ -80,6 +80,43 @@ document.addEventListener('alpine:init', () => {
     }
   })
 
+  Alpine.store('modal', {
+    isOpen: false,
+    type: 'notice',
+    title: '',
+    message: '',
+    confirmLabel: 'OK',
+    cancelLabel: 'Cancel',
+    confirmAction: null,
+    openNotice(title, message) {
+      this.type = 'notice'
+      this.title = title
+      this.message = message
+      this.confirmLabel = 'OK'
+      this.cancelLabel = 'Cancel'
+      this.confirmAction = null
+      this.isOpen = true
+    },
+    openConfirm(title, message, confirmAction, confirmLabel = 'Confirm', cancelLabel = 'Cancel') {
+      this.type = 'confirm'
+      this.title = title
+      this.message = message
+      this.confirmLabel = confirmLabel
+      this.cancelLabel = cancelLabel
+      this.confirmAction = confirmAction
+      this.isOpen = true
+    },
+    close() {
+      this.isOpen = false
+      this.confirmAction = null
+    },
+    async confirm() {
+      const action = this.confirmAction
+      this.close()
+      if (action) await action()
+    }
+  })
+
   Alpine.data('app', () => ({
     pages: [],
     dragging: false,
@@ -141,26 +178,31 @@ document.addEventListener('alpine:init', () => {
       Alpine.store('toasts').add('Copied ' + url, 'success')
     },
     async deletePage(page) {
-      if (!confirm('Delete ' + page.slug + '?')) return
-      try {
-        const res = await fetch('/api/page/' + encodeURIComponent(page.slug), { method: 'DELETE' })
-        const data = await res.json()
-        if (!data.ok) throw new Error(data.error)
-        this.pages = this.pages.filter((item) => item.slug !== page.slug)
-        Alpine.store('toasts').add('Deleted ' + page.slug, 'success')
-      } catch (err) {
-        Alpine.store('toasts').add('Delete failed: ' + err.message, 'error')
-      }
+      Alpine.store('modal').openConfirm('Delete page', 'Delete ' + page.slug + '?', async () => {
+        try {
+          const res = await fetch('/api/page/' + encodeURIComponent(page.slug), { method: 'DELETE' })
+          const data = await res.json()
+          if (!data.ok) throw new Error(data.error)
+          this.pages = this.pages.filter((item) => item.slug !== page.slug)
+          Alpine.store('toasts').add('Deleted ' + page.slug, 'success')
+        } catch (err) {
+          Alpine.store('modal').openNotice('Delete failed', err.message)
+        }
+      }, 'Delete')
     },
     async editPage(page) {
       try {
+        const dialog = document.getElementById('addDialog')
+        dialog.showModal()
+        window.dispatchEvent(new CustomEvent('dialog:edit-loading', { detail: { slug: page.slug, name: page.name || page.slug } }))
+        await new Promise((resolve) => requestAnimationFrame(resolve))
         const res = await fetch('/api/page/' + encodeURIComponent(page.slug))
         const data = await res.json()
         if (!data.ok) throw new Error(data.error)
-        const dialog = document.getElementById('addDialog')
-        dialog.showModal()
         queueMicrotask(() => window.dispatchEvent(new CustomEvent('dialog:edit', { detail: data })))
       } catch (err) {
+        window.dispatchEvent(new CustomEvent('dialog:edit-failed'))
+        Alpine.store('modal').openNotice('Edit failed', err.message)
         Alpine.store('toasts').add('Edit failed: ' + err.message, 'error')
       }
     }
@@ -173,6 +215,7 @@ document.addEventListener('alpine:init', () => {
     pageName: '',
     slug: generateSlug(),
     editSlug: '',
+    isLoadingEdit: false,
     slugTouched: false,
     canDeploy: false,
     deploying: false,
@@ -180,13 +223,21 @@ document.addEventListener('alpine:init', () => {
     renameTarget: null,
     fileChoiceState: null,
     init() {
+      window.addEventListener('dialog:edit-loading', (event) => {
+        this.reset()
+        this.mode = 'editor'
+        this.isLoadingEdit = true
+        this.editSlug = event.detail.slug
+        this.pageName = event.detail.name
+        this.canDeploy = false
+      })
       window.addEventListener('dialog:files', (event) => {
         this.setMode('files')
         this.validateFiles(event.detail.files)
       })
       window.addEventListener('dialog:edit', (event) => {
         const page = event.detail
-        this.reset()
+        this.isLoadingEdit = false
         this.mode = 'editor'
         this.editSlug = page.slug
         this.slug = page.slug
@@ -194,6 +245,9 @@ document.addEventListener('alpine:init', () => {
         this.htmlContent = page.html || ''
         this.slugTouched = true
         this.canDeploy = this.htmlContent.trim().length > 0
+      })
+      window.addEventListener('dialog:edit-failed', () => {
+        this.isLoadingEdit = false
       })
     },
     setMode(mode) {
@@ -339,6 +393,7 @@ document.addEventListener('alpine:init', () => {
       this.pageName = ''
       this.slug = generateSlug()
       this.editSlug = ''
+      this.isLoadingEdit = false
       this.slugTouched = false
       this.canDeploy = false
       this.deploying = false

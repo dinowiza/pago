@@ -73,8 +73,8 @@
         <input class="sr-only" type="file" multiple accept=".html,.htm,.css,.js,.json,.svg,.png,.jpg,.jpeg,.webp,.gif,.woff,.woff2,.zip" x-ref="fileInput" @change="validateFiles($event.target.files)" @cancel.stop="restoreFileChoiceState()">
 
         <div class="editor-zone" :class="extracting ? 'is-loading' : ''">
-          <textarea x-show="mode === 'editor'" x-model="htmlContent" @input="syncEditorState" placeholder="Paste HTML or drag files here…"></textarea>
-          <div class="file-summary" x-show="mode === 'files'">
+          <textarea x-show="mode === 'editor' && !isLoadingEdit" x-model="htmlContent" @input="syncEditorState" placeholder="Paste HTML or drag files here…"></textarea>
+          <div class="file-summary" x-show="mode === 'files' && !isLoadingEdit">
             <strong x-text="extracting ? 'Extracting ZIP...' : files.length ? files.length + ' file(s) ready' : 'Choose files or drop them on the page'"></strong>
             <template x-if="files.length">
               <ul>
@@ -83,6 +83,10 @@
                 </template>
               </ul>
             </template>
+          </div>
+          <div class="loading-state" x-show="isLoadingEdit">
+            <strong>Loading page…</strong>
+            <span>Preparing editor content</span>
           </div>
         </div>
 
@@ -110,6 +114,19 @@
       <template x-for="toast in $store.toasts.items" :key="toast.id">
         <div class="toast" :class="toast.type" x-text="toast.message"></div>
       </template>
+    </div>
+
+    <div class="app-modal-backdrop" x-cloak x-show="$store.modal.isOpen" x-transition.opacity @click.self="$store.modal.close()">
+      <section class="app-modal" role="dialog" aria-modal="true" :aria-labelledby="$store.modal.type + '-title'">
+        <h2 :id="$store.modal.type + '-title'" x-text="$store.modal.title"></h2>
+        <p x-text="$store.modal.message"></p>
+        <div class="app-modal-actions">
+          <template x-if="$store.modal.type === 'confirm'">
+            <button class="btn-secondary" type="button" @click="$store.modal.close()" x-text="$store.modal.cancelLabel"></button>
+          </template>
+          <button :class="$store.modal.type === 'confirm' ? 'btn-danger' : 'btn-primary'" type="button" @click="$store.modal.type === 'confirm' ? $store.modal.confirm() : $store.modal.close()" x-text="$store.modal.confirmLabel"></button>
+        </div>
+      </section>
     </div>
   </body>
 </html>
