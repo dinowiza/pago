@@ -43,15 +43,19 @@ const html = `<!doctype html>
 <script>
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
 e.preventDefault()
-var token = document.getElementById('tokenInput').value
+var token = document.getElementById('tokenInput').value.trim()
 var errorEl = document.getElementById('error')
 errorEl.hidden = true
+if (!token) return
 try {
 var res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) })
 var data = await res.json()
 if (data.ok) {
 localStorage.setItem('pago_admin_token', token)
 window.location.href = '/'
+} else if (data.error === 'token_not_configured') {
+errorEl.textContent = 'Admin token not configured on server'
+errorEl.hidden = false
 } else {
 errorEl.textContent = 'Invalid token'
 errorEl.hidden = false

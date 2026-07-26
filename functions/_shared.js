@@ -48,7 +48,7 @@ export function checkAdmin(request, env) {
   const adminToken = env.TOKEN
   if (!adminToken) return false
   const token = request.headers.get('X-Admin-Token')
-  return token === adminToken
+  return typeof token === 'string' && token.trim() === adminToken.trim()
 }
 
 export function contentTypeFor(path) {
