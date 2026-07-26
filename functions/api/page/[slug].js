@@ -1,4 +1,4 @@
-import { contentTypeFor, json, listAll, readManifest, safeObjectName, validateSlug, writeManifest } from '../../_shared.js'
+import { checkAdmin, contentTypeFor, json, listAll, readManifest, safeObjectName, validateSlug, writeManifest } from '../../_shared.js'
 
 export async function onRequestGet({ params, env }) {
   try {
@@ -14,7 +14,8 @@ export async function onRequestGet({ params, env }) {
   }
 }
 
-export async function onRequestDelete({ params, env }) {
+export async function onRequestDelete({ request, params, env }) {
+  if (!checkAdmin(request, env)) return json({ ok: false, error: 'unauthorized' }, 403)
   try {
     const slug = params.slug
     const manifest = await readManifest(env.BUCKET)
@@ -29,6 +30,7 @@ export async function onRequestDelete({ params, env }) {
 }
 
 export async function onRequestPatch({ request, params, env }) {
+  if (!checkAdmin(request, env)) return json({ ok: false, error: 'unauthorized' }, 403)
   try {
     const oldSlug = params.slug
     const body = await request.json()
@@ -62,6 +64,7 @@ export async function onRequestPatch({ request, params, env }) {
 }
 
 export async function onRequestPut({ request, params, env }) {
+  if (!checkAdmin(request, env)) return json({ ok: false, error: 'unauthorized' }, 403)
   try {
     const slug = params.slug
     const form = await request.formData()

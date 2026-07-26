@@ -19,6 +19,12 @@
       <header class="app-header">
         <a class="app-logo" href="/" aria-label="Pago home">Pago</a>
         <div class="header-actions">
+          <template x-if="$store.admin.isAdmin">
+            <button class="icon-btn" type="button" aria-label="Logout" @click="$store.admin.logout()" title="Logout">⇥</button>
+          </template>
+          <template x-if="!$store.admin.isAdmin">
+            <a class="icon-btn" href="/admin" aria-label="Admin login" title="Admin">⚙</a>
+          </template>
           <button class="icon-btn theme-toggle" type="button" aria-label="Toggle theme" @click="$store.theme.toggle()">
             <span aria-hidden="true" x-text="$store.theme.value === 'dark' ? '☼' : '◐'"></span>
           </button>
@@ -36,9 +42,13 @@
                 <summary aria-label="Page options">⋯</summary>
                 <div class="card-menu-panel">
                   <a :href="page.url" target="_blank" rel="noopener" @click.stop>Open</a>
-                  <button type="button" @click.stop="editPage(page)">Edit</button>
                   <button type="button" @click.stop="copyUrl(page)">Copy link</button>
-                  <button class="danger" type="button" @click.stop="deletePage(page)">Delete</button>
+                  <template x-if="$store.admin.isAdmin">
+                    <button type="button" @click.stop="editPage(page)">Edit</button>
+                  </template>
+                  <template x-if="$store.admin.isAdmin">
+                    <button class="danger" type="button" @click.stop="deletePage(page)">Delete</button>
+                  </template>
                 </div>
               </details>
               <h2 class="card-title" x-text="page.name || page.slug"></h2>

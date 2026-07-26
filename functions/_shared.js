@@ -44,6 +44,13 @@ export async function listAll(bucket, prefix) {
   return objects
 }
 
+export function checkAdmin(request, env) {
+  const adminToken = env.TOKEN
+  if (!adminToken) return false
+  const token = request.headers.get('X-Admin-Token')
+  return token === adminToken
+}
+
 export function contentTypeFor(path) {
   const ext = path.split('.').pop().toLowerCase()
   return {

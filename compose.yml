@@ -1,8 +1,18 @@
 services:
-  ui:
-    image: caddy:2-alpine
-    command: caddy file-server --root /srv --listen :8080
+  worker:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    command: npx --yes wrangler pages dev . --ip 0.0.0.0 --port 8787 --compatibility-date 2024-09-01 --persist-to /data
     ports:
-      - "8080:8080"
+      - "8787:8787"
     volumes:
-      - ./:/srv:ro
+      - ./:/app
+      - wrangler_state:/data
+      - /app/node_modules
+    environment:
+      - WRANGLER_SEND_METRICS=false
+      - CI=true
+      - TOKEN=${TOKEN:-dev-token-change-me}
+
+volumes:
+  wrangler_state:

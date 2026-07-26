@@ -51,7 +51,29 @@ function hasUnsafePath(name) {
   return name.startsWith('/') || name.split('/').some((part) => part === '..' || part === '')
 }
 
+function adminFetch(url, options = {}) {
+  const token = localStorage.getItem('pago_admin_token')
+  if (token) {
+    options.headers = { ...options.headers, 'X-Admin-Token': token }
+  }
+  return fetch(url, options)
+}
+
 document.addEventListener('alpine:init', () => {
+  Alpine.store('admin', {
+    token: '',
+    init() {
+      this.token = localStorage.getItem('pago_admin_token') || ''
+    },
+    get isAdmin() {
+      return !!this.token
+    },
+    logout() {
+      this.token = ''
+      localStorage.removeItem('pago_admin_token')
+    }
+  })
+
   Alpine.store('theme', {
     value: 'dark',
     init() {
@@ -180,7 +202,7 @@ document.addEventListener('alpine:init', () => {
     async deletePage(page) {
       Alpine.store('modal').openConfirm('Delete page', 'Delete ' + page.slug + '?', async () => {
         try {
-          const res = await fetch('/api/page/' + encodeURIComponent(page.slug), { method: 'DELETE' })
+          const res = await adminFetch('/api/page/' + encodeURIComponent(page.slug), { method: 'DELETE' })
           const data = await res.json()
           if (!data.ok) throw new Error(data.error)
           this.pages = this.pages.filter((item) => item.slug !== page.slug)
@@ -415,7 +437,7 @@ document.addEventListener('alpine:init', () => {
         files.forEach((file, index) => fd.append('file_' + index, file, file.name))
       }
       try {
-        const res = await fetch(this.editSlug ? '/api/page/' + encodeURIComponent(this.editSlug) : '/upload', { method: this.editSlug ? 'PUT' : 'POST', body: fd })
+        const res = await adminFetch(this.editSlug ? '/api/page/' + encodeURIComponent(this.editSlug) : '/upload', { method: this.editSlug ? 'PUT' : 'POST', body: fd })
         const data = await res.json()
         if (!data.ok) throw new Error(data.error)
         Alpine.store('toasts').add((this.editSlug ? 'Updated ' : 'Page deployed at ') + data.url, 'success')
